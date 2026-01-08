@@ -1,1 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Advanced Snake Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --bg: #020617;
+    --panel: #0f172a;
+    --snake: #22c55e;
+    --food: #ef4444;
+    --text: #e5e7eb;
+}
+
+body.light {
+    --bg: #f8fafc;
+    --panel: #e5e7eb;
+    --snake: #16a34a;
+    --food: #dc2626;
+    --text: #020617;
+}
+
+body {
+    margin: 0;
+    background: radial-gradient(circle at top, var(--panel), var(--bg));
+    color: var(--text);
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.game-box {
+    text-align: center;
+}
+
+h1 {
+    margin-bottom: 5px;
+}
+
+.stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+canvas {
+    background: var(--bg);
+    border-radius: 14px;
+    box-shadow: 0 0 40px rgba(34,197,94,0.4);
+}
+
+button {
+    margin-top: 10px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background: var(--snake);
+    color: #fff;
+    font-weight: bold;
+}
+
+.controls {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, 60px);
+    gap: 8px;
+    justify-content: center;
+}
+
+.controls button {
+    padding: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="game-box">
+    <h1>🐍 Snake Game</h1>
+
+    <div class="stats">
+        <div>Score: <span id="score">0</span></div>
+        <div>High: <span id="high">0</span></div>
+        <div>Level: <span id="level">1</span></div>
+    </div>
+
+    <canvas id="game" width="400" height="400"></canvas>
+
+    <div>
+        <button onclick="toggleTheme()">Toggle Theme</button>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div class="controls">
+        <div></div>
+        <button onclick="setDir('UP')">⬆️</button>
+        <div></div>
+        <button onclick="setDir('LEFT')">⬅️</button>
+        <button onclick="setDir('DOWN')">⬇️</button>
+        <button onclick="setDir('RIGHT')">➡️</button>
+    </div>
+</div>
+
+<!-- Sounds -->
+<audio id="eatSound" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.wav"></audio>
+<audio id="overSound" src="https://assets.mixkit.co/sfx/preview/mixkit-retro-arcade-game-over-470.wav"></audio>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const box = 20;
+let snake = [{ x: 9 * box, y: 10 * box }];
+let direction = "RIGHT";
+let score = 0;
+let level = 1;
+let speed = 120;
+
+let highScore = localStorage.getItem("snakeHigh") || 0;
+document.getElementById("high").innerText = highScore;
+
+let food = spawnFood();
+
+function spawnFood() {
+    return {
+        x: Math.floor(Math.random() * 19 + 1) * box,
+        y: Math.floor(Math.random() * 19 + 1) * box
+    };
+}
+
+document.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+    if (e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+    if (e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+    if (e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+});
+
+function setDir(dir) {
+    if (dir === "LEFT" && direction !== "RIGHT") direction = dir;
+    if (dir === "UP" && direction !== "DOWN") direction = dir;
+    if (dir === "RIGHT" && direction !== "LEFT") direction = dir;
+    if (dir === "DOWN" && direction !== "UP") direction = dir;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    snake.forEach((s, i) => {
+        ctx.fillStyle = i === 0 ? getVar("--snake") : "#4ade80";
+        ctx.shadowColor = getVar("--snake");
+        ctx.shadowBlur = 15;
+        ctx.fillRect(s.x, s.y, box, box);
+        ctx.shadowBlur = 0;
+    });
+
+    ctx.fillStyle = getVar("--food");
+    ctx.shadowColor = getVar("--food");
+    ctx.shadowBlur = 20;
+    ctx.fillRect(food.x, food.y, box, box);
+    ctx.shadowBlur = 0;
+
+    let headX = snake[0].x;
+    let headY = snake[0].y;
+
+    if (direction === "LEFT") headX -= box;
+    if (direction === "UP") headY -= box;
+    if (direction === "RIGHT") headX += box;
+    if (direction === "DOWN") headY += box;
+
+    if (headX === food.x && headY === food.y) {
+        score++;
+        document.getElementById("score").innerText = score;
+        document.getElementById("eatSound").play();
+        food = spawnFood();
+
+        if (score % 5 === 0) {
+            level++;
+            speed -= 10;
+            restartGame();
+        }
+    } else {
+        snake.pop();
+    }
+
+    let newHead = { x: headX, y: headY };
+
+    if (
+        headX < 0 || headY < 0 ||
+        headX >= canvas.width || headY >= canvas.height ||
+        snake.some(s => s.x === headX && s.y === headY)
+    ) {
+        gameOver();
+    }
+
+    snake.unshift(newHead);
+}
+
+function gameOver() {
+    document.getElementById("overSound").play();
+    if (score > highScore) {
+        localStorage.setItem("snakeHigh", score);
+    }
+    alert("Game Over! Score: " + score);
+    location.reload();
+}
+
+function restartGame() {
+    clearInterval(game);
+    document.getElementById("level").innerText = level;
+    game = setInterval(draw, speed);
+}
+
+function toggleTheme() {
+    document.body.classList.toggle("light");
+}
+
+function getVar(name) {
+    return getComputedStyle(document.body).getPropertyValue(name);
+}
+
+let game = setInterval(draw, speed);
+</script>
+
+</body>
+</html>
 
