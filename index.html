@@ -94,6 +94,9 @@ button {
 
     <div>
         <button onclick="toggleTheme()">Toggle Theme</button>
+        <button onclick="restartGame(true)">Restart</button>
+        <button onclick="togglePause()"><span id="pauseText">Pause</span></button>
+        <button onclick="toggleSound()">🔊</button>
     </div>
 
     <!-- Mobile Controls -->
@@ -116,16 +119,24 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 const box = 20;
-let snake = [{ x: 9 * box, y: 10 * box }];
-let direction = "RIGHT";
-let score = 0;
-let level = 1;
-let speed = 120;
+let snake, direction, score, level, speed, food;
+let gameInterval;
+let paused = false;
+let soundOn = true;
 
 let highScore = localStorage.getItem("snakeHigh") || 0;
 document.getElementById("high").innerText = highScore;
 
-let food = spawnFood();
+function initGame() {
+    snake = [{ x: 9 * box, y: 10 * box }];
+    direction = "RIGHT";
+    score = 0;
+    level = 1;
+    speed = 120;
+    food = spawnFood();
+    document.getElementById("score").innerText = score;
+    document.getElementById("level").innerText = level;
+}
 
 function spawnFood() {
     return {
@@ -149,8 +160,11 @@ function setDir(dir) {
 }
 
 function draw() {
+    if(paused) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw Snake
     snake.forEach((s, i) => {
         ctx.fillStyle = i === 0 ? getVar("--snake") : "#4ade80";
         ctx.shadowColor = getVar("--snake");
@@ -159,6 +173,7 @@ function draw() {
         ctx.shadowBlur = 0;
     });
 
+    // Draw Food with glow
     ctx.fillStyle = getVar("--food");
     ctx.shadowColor = getVar("--food");
     ctx.shadowBlur = 20;
@@ -173,16 +188,19 @@ function draw() {
     if (direction === "RIGHT") headX += box;
     if (direction === "DOWN") headY += box;
 
+    // Eat food
     if (headX === food.x && headY === food.y) {
         score++;
+        if(soundOn) document.getElementById("eatSound").play();
         document.getElementById("score").innerText = score;
-        document.getElementById("eatSound").play();
         food = spawnFood();
 
+        // Level up every 5 points
         if (score % 5 === 0) {
             level++;
-            speed -= 10;
-            restartGame();
+            speed = Math.max(40, speed - 10); // increase speed
+            restartGame(false);
+            document.getElementById("level").innerText = level;
         }
     } else {
         snake.pop();
@@ -190,30 +208,34 @@ function draw() {
 
     let newHead = { x: headX, y: headY };
 
+    // Collision detection
     if (
         headX < 0 || headY < 0 ||
         headX >= canvas.width || headY >= canvas.height ||
         snake.some(s => s.x === headX && s.y === headY)
     ) {
         gameOver();
+        return;
     }
 
     snake.unshift(newHead);
 }
 
 function gameOver() {
-    document.getElementById("overSound").play();
+    if(soundOn) document.getElementById("overSound").play();
     if (score > highScore) {
         localStorage.setItem("snakeHigh", score);
+        highScore = score;
+        document.getElementById("high").innerText = highScore;
     }
     alert("Game Over! Score: " + score);
-    location.reload();
+    restartGame(true);
 }
 
-function restartGame() {
-    clearInterval(game);
-    document.getElementById("level").innerText = level;
-    game = setInterval(draw, speed);
+function restartGame(resetScore) {
+    clearInterval(gameInterval);
+    if(resetScore) initGame();
+    gameInterval = setInterval(draw, speed);
 }
 
 function toggleTheme() {
@@ -224,9 +246,14 @@ function getVar(name) {
     return getComputedStyle(document.body).getPropertyValue(name);
 }
 
-let game = setInterval(draw, speed);
-</script>
+function togglePause() {
+    paused = !paused;
+    document.getElementById("pauseText").innerText = paused ? "Resume" : "Pause";
+}
 
-</body>
-</html>
+function toggleSound() {
+    soundOn = !soundOn;
+}
 
+initGame();
+gameInterval = setInterval(draw, spe
